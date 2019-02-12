@@ -400,7 +400,7 @@ namespace GoodAI.Modules.Scripting
 
                 if (branchConf.Length > 0)
                 {
-                    MyLog.INFO.WriteLine("creating: " + branchConf.Length + " outputs");
+                    MyLog.DEBUG.WriteLine("creating: " + branchConf.Length + " outputs");
                     branchSizes = new TensorDimensions[branchConf.Length];
 
                     try
@@ -411,7 +411,7 @@ namespace GoodAI.Modules.Scripting
                             string[] dimConf = branchConf[i].Split('x');
                             if (dimConf.Length > 1)
                             {
-                                MyLog.INFO.WriteLine("Multidimensional");
+                                MyLog.DEBUG.WriteLine("Multidimensional");
                                 TensorDimensions f = null;
 
                                 for (int j = 0; j < dimConf.Length; j++)
@@ -430,15 +430,15 @@ namespace GoodAI.Modules.Scripting
                                     }
                                 }
 
-                                MyLog.INFO.WriteLine("TD: " + f.Print(true));
+                                MyLog.DEBUG.WriteLine("TD: " + f.Print(true));
                                 
                                 branchSizes[i] = f;
                             }
                             else
                             {
-                                MyLog.INFO.WriteLine("Monodimensional");
+                                MyLog.DEBUG.WriteLine("Monodimensional");
                                 int h = int.Parse(branchConf[i], CultureInfo.InvariantCulture);
-                                MyLog.INFO.WriteLine("adding: " + h);
+                                MyLog.DEBUG.WriteLine("adding: " + h);
                                 branchSizes[i] = new TensorDimensions(h);
                             }
                         }
