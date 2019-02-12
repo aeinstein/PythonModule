@@ -2,8 +2,6 @@ using GoodAI.Core.Memory;
 using GoodAI.Core.Task;
 using GoodAI.Core.Utils;
 using GoodAI.Core.Nodes;
-using GoodAI.Modules.Transforms;
-using ManagedCuda.BasicTypes;
 using System.ComponentModel;
 using YAXLib;
 using System;
@@ -11,7 +9,6 @@ using System.Collections.Generic;
 using System.Globalization;
 using System.Windows.Forms.Design;
 using System.Drawing.Design;
-using System.Drawing;
 using IronPython.Hosting;
 using Microsoft.Scripting.Hosting;
 using IronPython.Runtime;
@@ -229,6 +226,7 @@ namespace GoodAI.Modules.Scripting
                     input[i] = source.GetInput(i).Host;
                 }
 
+                // create arrays
                 output = new float[source.OutputBranches][];
                 for (int i = 0; i < source.OutputBranches; ++i)
                 {
@@ -332,8 +330,19 @@ namespace GoodAI.Modules.Scripting
             return parent;
         }
 
-        public int Input0Count { get { return GetInput(0) != null ? GetInput(0).Count : 0; } }
-        public int Input0ColHint { get { return GetInput(0) != null ? GetInput(0).ColumnHint : 0; } }
+        public int Input0Count {
+            get
+            {
+                return GetInput(0) != null ? GetInput(0).Count : 0;
+            }
+        }
+
+        public int Input0ColHint {
+            get
+            {
+                return GetInput(0) != null ? GetInput(0).ColumnHint : 0;
+            }
+        }
 
         private string m_branches;
         [MyBrowsable, Category("Structure")]
@@ -350,7 +359,7 @@ namespace GoodAI.Modules.Scripting
 
         public void InitOutputs()
         {
-            int[] branchConf = GetOutputBranchSpec();
+            TensorDimensions[] branchConf = GetOutputBranchSpec();
 
             if (branchConf != null)
             {
@@ -363,13 +372,15 @@ namespace GoodAI.Modules.Scripting
                         MyMemoryManager.Instance.RemoveBlock(this, mb);
                     }
 
+                    // set new
                     OutputBranches = branchConf.Length;
 
                     for (int i = 0; i < branchConf.Length; i++)
                     {
                         MyMemoryBlock<float> mb = MyMemoryManager.Instance.CreateMemoryBlock<float>(this);
                         mb.Name = "Output_" + (i + 1);
-                        mb.Count = 0;
+                        mb.Dims = branchConf[i];
+                        //mb.Count = 0;
                         m_outputs[i] = mb;
                     }
                 }
@@ -378,9 +389,9 @@ namespace GoodAI.Modules.Scripting
             }
         }
 
-        private int[] GetOutputBranchSpec()
+        private TensorDimensions[] GetOutputBranchSpec()
         {
-            int[] branchSizes = null;
+            TensorDimensions[] branchSizes = null;
 
             bool ok = true;
             if (OutputBranchesSpec != null && OutputBranchesSpec != "")
@@ -389,18 +400,52 @@ namespace GoodAI.Modules.Scripting
 
                 if (branchConf.Length > 0)
                 {
-                    branchSizes = new int[branchConf.Length];
+                    MyLog.INFO.WriteLine("creating: " + branchConf.Length + " outputs");
+                    branchSizes = new TensorDimensions[branchConf.Length];
 
-                    for (int i = 0; i < branchConf.Length; i++)
+                    try
                     {
-                        try
+                        for (int i = 0; i < branchConf.Length; i++)
                         {
-                            branchSizes[i] = int.Parse(branchConf[i], CultureInfo.InvariantCulture);
+                            // parsing multidimensional
+                            string[] dimConf = branchConf[i].Split('x');
+                            if (dimConf.Length > 1)
+                            {
+                                MyLog.INFO.WriteLine("Multidimensional");
+                                TensorDimensions f = null;
+
+                                for (int j = 0; j < dimConf.Length; j++)
+                                {
+
+                                    int h = int.Parse(dimConf[j], CultureInfo.InvariantCulture);
+                                    MyLog.INFO.WriteLine("adding: " + h);
+
+                                    if (j == 0)
+                                    {
+                                        f = new TensorDimensions(new int[] { h });
+                                    } 
+                                    else
+                                    {
+                                        f = f.AddDimensions(new int[] { h });
+                                    }
+                                }
+
+                                MyLog.INFO.WriteLine("TD: " + f.Print(true));
+                                
+                                branchSizes[i] = f;
+                            }
+                            else
+                            {
+                                MyLog.INFO.WriteLine("Monodimensional");
+                                int h = int.Parse(branchConf[i], CultureInfo.InvariantCulture);
+                                MyLog.INFO.WriteLine("adding: " + h);
+                                branchSizes[i] = new TensorDimensions(h);
+                            }
                         }
-                        catch
-                        {
-                            ok = false;
-                        }
+                    }
+                    catch
+                    {
+                        ok = false;
                     }
                 }
             }
@@ -414,19 +459,22 @@ namespace GoodAI.Modules.Scripting
 
         private void UpdateOutputBlocks()
         {
-            int [] op = GetOutputBranchSpec();
+            TensorDimensions[] op = GetOutputBranchSpec();
+
+            MyLog.DEBUG.WriteLine("branches: " + op.Length);
 
             if (op != null)
             {
-                int sum = 0;
+                int sum = 0;   // memsize
                 for (int i = 0; i < op.Length; i++)
                 {
-                    sum += op[i];
+                    sum += op[i].GetSize();
                 }
+                MyLog.DEBUG.WriteLine("bytes: " + sum);
 
                 for (int i = 0; i < op.Length; i++)
                 {
-                    GetOutput(i).Count = op[i];
+                    GetOutput(i).Dims = op[i];
                 }
             }
         }
